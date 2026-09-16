@@ -1,0 +1,197 @@
+# ==============================================================================
+# No-effort sensitivity model for Mediterranean shortfin mako
+#
+# Associated study:
+# "Integrating opportunistic records to model spatio-temporal abundance of a
+# Critically Endangered pelagic shark in the Mediterranean Sea"
+#
+# This script fits the sensitivity model without source-specific
+# observation-effort correction.
+# All covariates are supplied as processed model inputs.
+
+# ==============================================================================
+
+
+## ---- Packages ----------------------------------------------------------------
+
+library(INLA)
+library(inlabru)
+library(fmesher)
+library(sf)
+library(sp)
+library(terra)
+
+
+## ---- Load processed model inputs ---------------------------------------------
+
+# Required objects in data/model_inputs.RData:
+#   mk.MED
+#   mk.SP
+#   mesh_medit
+#   triBarrier
+#   aoi.sf
+#   depth.r
+#   bpi.r
+#   sstc_s.mesh
+#   sstc_res.mesh
+#   sstc_t
+
+load("data/model_inputs.RData")
+
+
+
+## ---- Barrier SPDE model -------------------------------------------------------
+
+barrier.model <- INLA::inla.barrier.pcmatern(
+  mesh_medit,
+  barrier.triangles = triBarrier,
+  prior.range = c(800, 0.7),
+  prior.sigma = c(1, 0.1)
+)
+
+
+## ---- Temporal component -------------------------------------------------------
+
+# One temporal mesh node per modelled year (2017--2022).
+knots <- seq(1, 6, 1)
+
+mesh1D <- fmesher::fm_mesh_1d(
+  knots,
+  boundary = "free"
+)
+
+spline.t <- INLA::inla.spde2.pcmatern(
+  mesh1D,
+  prior.range = c(5, 0.8),
+  prior.sigma = c(1, 0.1)
+)
+
+
+## ---- Model components ---------------------------------------------------------
+
+# Same ecological model as the effort-corrected formulation,
+# but without source-specific detection terms.
+
+cmp <- ~ 0 +
+  intercept1(
+    1,
+    mean.linear = 0,
+    prec.linear = 2
+  ) +
+  SPDE(
+    geometry,
+    model = barrier.model,
+    mapper = bru_mapper(mesh_medit)
+  ) +
+  depth_s(
+    depth.r$depth,
+    mean.linear = 0.5,
+    prec.linear = 2
+  ) +
+  sstc_s(
+    sstc_s.mesh$sstc_s.r,
+    mean.linear = 0,
+    prec.linear = 5
+  ) +
+  sstc_res(
+    eval_spatial(sstc_res.mesh, .data., layer = Year1),
+    model = "linear",
+    mean.linear = 1,
+    prec.linear = 2
+  ) +
+  sstc_temp(
+    sstc_t,
+    model = "linear",
+    mean.linear = 1,
+    prec.linear = 5
+  ) +
+  bpi(
+    bpi.r$bpi,
+    mean.linear = 1,
+    prec.linear = 5
+  ) +
+  Year_cov(
+    Year1,
+    model = spline.t
+  )
+
+
+## ---- Likelihoods --------------------------------------------------------------
+
+formula_MED <- geometry + Year1 ~
+  intercept1 +
+  SPDE +
+  depth_s +
+  sstc_s +
+  sstc_res +
+  sstc_temp +
+  bpi +
+  Year_cov
+
+formula_SP <- geometry + Year1 ~
+  intercept1 +
+  SPDE +
+  depth_s +
+  sstc_s +
+  sstc_res +
+  sstc_temp +
+  bpi +
+  Year_cov
+
+boundary <- as(aoi.sf, "Spatial")
+boundary_domain <- sf::st_as_sf(boundary)
+
+lik_MED <- bru_obs(
+  "cp",
+  formula = formula_MED,
+  samplers = boundary_domain,
+  domain = list(
+    geometry = mesh_medit,
+    Year1 = 1:6
+  ),
+  data = mk.MED
+)
+
+lik_SP <- bru_obs(
+  "cp",
+  formula = formula_SP,
+  samplers = boundary_domain,
+  domain = list(
+    geometry = mesh_medit,
+    Year1 = 1:6
+  ),
+  data = mk.SP
+)
+
+
+## ---- Fit model ----------------------------------------------------------------
+
+fit_no_effort <- bru(
+  components = cmp,
+  lik_MED,
+  lik_SP,
+  options = list(
+    verbose = FALSE,
+    inla.mode = "experimental",
+    bru_max_iter = 35,
+    control.inla = list(
+      int.strategy = "eb"
+    )
+  )
+)
+
+
+## ---- Model summary ------------------------------------------------------------
+
+summary(fit_no_effort)
+
+
+## ---- Optional: save fitted model ---------------------------------------------
+
+# Uncomment if a serialized fitted-model object is required.
+#
+# dir.create("output", showWarnings = FALSE)
+# save(
+#   fit_no_effort,
+#   file = "output/fit_no_effort.RData"
+# )
