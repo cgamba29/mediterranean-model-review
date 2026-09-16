@@ -24,8 +24,7 @@ library(terra)
 
 ## ---- Load processed model inputs ---------------------------------------------
 
-# The repository should contain:
-# data/model_inputs.RData
+# The repository should contain: model_inputs.RData
 #
 # Required objects:
 #   mk.MED          MEDLEM occurrences used for model fitting
