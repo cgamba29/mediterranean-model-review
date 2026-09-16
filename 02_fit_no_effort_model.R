@@ -24,7 +24,7 @@ library(terra)
 
 ## ---- Load processed model inputs ---------------------------------------------
 
-# Required objects in data/model_inputs.RData:
+# Required objects in model_inputs.RData:
 #   mk.MED
 #   mk.SP
 #   mesh_medit
