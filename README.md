@@ -10,16 +10,15 @@ observation process.
 ## Repository contents
 
 - `01_fit_effort_corrected_model.R`  
-  Fits the main effort-corrected thinned log-Gaussian Cox process model.
+Fits the main effort-corrected thinned log-Gaussian Cox process model, computes the annual relative abundance index, and estimates the relative change between 2017 and 2022 from joint posterior draws.
 
 - `02_fit_no_effort_model.R`  
   Fits the corresponding model without observation-effort correction, used as
   a sensitivity analysis.
 
 - `model_inputs.RData`  
-  Contains the processed occurrence data, environmental covariates, spatial
-  mesh and barrier objects, and source-specific observation-effort surfaces
-  required to fit the models.
+Contains the processed occurrence data, environmental covariates, spatial mesh and barrier objects, and source-specific observation-effort surfaces required to fit the models.
+
 
 ## Software
 
@@ -42,6 +41,9 @@ Both scripts load the processed inputs from:
 ```r
 model_inputs.RData
 ```
+
+
+
 
 
 
